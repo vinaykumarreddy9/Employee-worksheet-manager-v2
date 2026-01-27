@@ -1,6 +1,9 @@
 import gspread
+import os
+import json
 from oauth2client.service_account import ServiceAccountCredentials
 from backend.config import settings
+from datetime import datetime
 import sys
 
 def setup_spreadsheet():
@@ -9,15 +12,32 @@ def setup_spreadsheet():
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(
-            settings.GOOGLE_SERVICE_ACCOUNT_FILE, scope
-        )
+        
+        # Robust Credential Loading (Support JSON string or File)
+        if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
+            try:
+                json_str = settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()
+                if json_str.startswith("'") and json_str.endswith("'"):
+                    json_str = json_str[1:-1]
+                creds_dict = json.loads(json_str)
+                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            except Exception as e:
+                print(f"Error parsing GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+                sys.exit(1)
+        else:
+            creds_file = os.path.join(os.getcwd(), "credentials.json")
+            if not os.path.exists(creds_file):
+                print(f"Error: Neither GOOGLE_SERVICE_ACCOUNT_JSON env var nor {creds_file} found.")
+                sys.exit(1)
+            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_file, scope)
+
         client = gspread.authorize(creds)
         
         try:
             spreadsheet = client.open_by_key(settings.GOOGLE_SHEET_ID)
-        except Exception:
+        except Exception as e:
             print(f"Error: Could not open spreadsheet with ID '{settings.GOOGLE_SHEET_ID}'.")
+            print(f"Details: {e}")
             print("Make sure you have shared the spreadsheet with the service account email.")
             return
 
@@ -47,18 +67,34 @@ def setup_spreadsheet():
             else:
                 print(f"Syncing headers for: {sheet_name}")
                 worksheet = spreadsheet.worksheet(sheet_name)
-                # Ensure the sheet has exactly the number of columns we expect to prune extras
                 worksheet.resize(cols=len(headers))
-                # Overwrite first row
                 worksheet.update('A1', [headers])
                 
+        # --- Add Default Admin User if Logins is Empty ---
+        login_sheet = spreadsheet.worksheet("User Logins")
+        admins = login_sheet.get_all_records()
+        if not admins:
+            print("Seeding default Admin user...")
+            admin_data = [
+                "admin@company.com", 
+                "admin123", # Plain text as per project requirements
+                "Admin",
+                "Active",
+                "System Administrator",
+                "ADMIN-01",
+                datetime.now().isoformat()
+            ]
+            login_sheet.append_row(admin_data)
+            print("Default credentials: admin@company.com / admin123")
+        
         print("\nSpreadsheet Setup completed successfully!")
         
     except Exception as e:
         print(f"An error occurred during setup: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     if not settings.GOOGLE_SHEET_ID:
-        print("Error: GOOGLE_SHEET_ID not set in .env")
+        print("Error: GOOGLE_SHEET_ID not set")
         sys.exit(1)
     setup_spreadsheet()

@@ -170,8 +170,13 @@ st.markdown("""
 
 # --- Constants & State ---
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# If BACKEND_URL is provided as a hostname:port (Render internal), add http://
 if BACKEND_URL and not BACKEND_URL.startswith("http"):
     BACKEND_URL = f"http://{BACKEND_URL}"
+
+# If on Render, the internal host/port might still fail if not reachable. 
+# We'll handle this in the api_call with better error reporting.
 
 if "user" not in st.session_state: st.session_state.user = None
 if "step" not in st.session_state: st.session_state.step = "login"
@@ -182,18 +187,23 @@ if "access_token" not in st.session_state: st.session_state.access_token = None
 # --- API Helpers ---
 def api_call(method, endpoint, data=None, params=None):
     try:
-        url = f"{BACKEND_URL}/{endpoint}"
+        # Check if we need to append a port for internal Render communication
+        # Render internal hostnames usually need the listening port (8000)
+        final_url = f"{BACKEND_URL}/{endpoint}"
+        
         headers = {}
         if st.session_state.access_token:
             headers["Authorization"] = f"Bearer {st.session_state.access_token}"
             
         if method == "POST":
-            res = requests.post(url, json=data, headers=headers)
+            res = requests.post(final_url, json=data, headers=headers, timeout=10)
         else:
-            res = requests.get(url, params=params, headers=headers)
+            res = requests.get(final_url, params=params, headers=headers, timeout=10)
         return res
     except Exception as e:
-        # Don't show error here, handle it in the UI caller
+        st.error(f"📡 **API Connection Error:** Could not reach the backend server.")
+        st.info(f"Connecting to: `{BACKEND_URL}`")
+        st.divider()
         print(f"📡 API Connection Error: {e}")
         return None
 

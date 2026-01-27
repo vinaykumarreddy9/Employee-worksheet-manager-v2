@@ -1,10 +1,14 @@
-import gspread
+import sys
 import os
 import json
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from backend.config import settings
 from datetime import datetime
-import sys
+
+# Ensure the root directory is in the path so we can import 'backend'
+sys.path.append(os.getcwd())
+
+from backend.config import settings
 
 def setup_spreadsheet():
     try:

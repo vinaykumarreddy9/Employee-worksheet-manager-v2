@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+gunicorn
 streamlit
 gspread
 oauth2client
@@ -10,7 +11,8 @@ apscheduler
 requests
 python-multipart
 pandas
-python-jose
+python-jose[cryptography]
 httpx
 pytest
-pytest-asynciogunicorn
+pytest-asyncio
+cryptography

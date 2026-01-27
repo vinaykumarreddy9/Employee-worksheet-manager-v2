@@ -35,8 +35,17 @@ class SheetManager:
     def client(self):
         if self._client is None:
             if settings.GOOGLE_SERVICE_ACCOUNT_JSON:
-                creds_dict = json.loads(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-                self.creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+                try:
+                    # Strip any potential wrapping quotes or white space
+                    json_str = settings.GOOGLE_SERVICE_ACCOUNT_JSON.strip()
+                    if json_str.startswith("'") and json_str.endswith("'"):
+                        json_str = json_str[1:-1]
+                    
+                    creds_dict = json.loads(json_str)
+                    self.creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, self.scope)
+                except Exception as e:
+                    logger.error(f"CRITICAL: Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON. Error: {e}")
+                    raise RuntimeError(f"JSON Parsing Error for Service Account: {e}")
             else:
                 self.creds = ServiceAccountCredentials.from_json_keyfile_name(
                     os.path.join(os.getcwd(), "credentials.json"), self.scope

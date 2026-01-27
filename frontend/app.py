@@ -185,8 +185,10 @@ if "otp_purpose" not in st.session_state: st.session_state.otp_purpose = ""
 if "access_token" not in st.session_state: st.session_state.access_token = None
 
 # --- API Helpers ---
-def api_call(method, endpoint, data=None, params=None, retries=3):
-    final_url = f"{BACKEND_URL}/{endpoint}"
+def api_call(method, endpoint, data=None, params=None, retries=5):
+    # Ensure no double slashes if BACKEND_URL has a trailing slash
+    base_url = BACKEND_URL.rstrip("/")
+    final_url = f"{base_url}/{endpoint}"
     res = None
     
     for attempt in range(retries):
@@ -200,20 +202,26 @@ def api_call(method, endpoint, data=None, params=None, retries=3):
             else:
                 res = requests.get(final_url, params=params, headers=headers, timeout=20)
             
-            # If we get a valid response, return it immediately
-            if res.status_code < 500:
+            # Check if this is a valid JSON response
+            # Sometimes Render/Proxies return a 200 OK with an HTML loading page
+            content_type = res.headers.get("Content-Type", "").lower()
+            is_json = "application/json" in content_type
+            
+            if res.status_code == 200 and is_json:
                 return res
             
-            # If it's a server error (502/503/504), it might be waking up
-            if res.status_code in [502, 503, 504]:
+            # If it's a 200 but not JSON, or a 50x error, it's likely the server waking up
+            if (res.status_code == 200 and not is_json) or res.status_code in [502, 503, 504]:
                 if attempt < retries - 1:
-                    time.sleep(2) # Wait for wake-up
+                    wait_time = 2 + attempt # Increasing wait
+                    time.sleep(wait_time)
                     continue
-            return res
+            
+            return res # Return what we have for 4xx or persistent errors
             
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             if attempt < retries - 1:
-                time.sleep(2)
+                time.sleep(3)
                 continue
             break
         except Exception as e:

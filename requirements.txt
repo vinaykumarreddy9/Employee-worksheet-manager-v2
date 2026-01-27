@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+streamlit
+gspread
+oauth2client
+pydantic
+pydantic-settings
+python-dotenv
+apscheduler
+requests
+python-multipart
+pandas
+python-jose
+httpx
+pytest
+pytest-asynciogunicorn

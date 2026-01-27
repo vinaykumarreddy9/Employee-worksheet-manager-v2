@@ -185,27 +185,46 @@ if "otp_purpose" not in st.session_state: st.session_state.otp_purpose = ""
 if "access_token" not in st.session_state: st.session_state.access_token = None
 
 # --- API Helpers ---
-def api_call(method, endpoint, data=None, params=None):
+def api_call(method, endpoint, data=None, params=None, retries=3):
     final_url = f"{BACKEND_URL}/{endpoint}"
     res = None
-    try:
-        headers = {}
-        if st.session_state.access_token:
-            headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+    
+    for attempt in range(retries):
+        try:
+            headers = {}
+            if st.session_state.access_token:
+                headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+                
+            if method == "POST":
+                res = requests.post(final_url, json=data, headers=headers, timeout=20)
+            else:
+                res = requests.get(final_url, params=params, headers=headers, timeout=20)
             
-        if method == "POST":
-            res = requests.post(final_url, json=data, headers=headers, timeout=15)
-        else:
-            res = requests.get(final_url, params=params, headers=headers, timeout=15)
-        return res
-    except Exception as e:
+            # If we get a valid response, return it immediately
+            if res.status_code < 500:
+                return res
+            
+            # If it's a server error (502/503/504), it might be waking up
+            if res.status_code in [502, 503, 504]:
+                if attempt < retries - 1:
+                    time.sleep(2) # Wait for wake-up
+                    continue
+            return res
+            
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt < retries - 1:
+                time.sleep(2)
+                continue
+            break
+        except Exception as e:
+            print(f"📡 API Error: {e}")
+            break
+            
+    if res is None:
         st.error(f"📡 **API Connection Error:** Could not reach the backend server.")
         st.info(f"Connecting to: `{final_url}`")
-        if res is not None:
-            st.warning(f"Status Code: {res.status_code}")
         st.divider()
-        print(f"📡 API Connection Error: {e}")
-        return None
+    return res
 
 # --- UI Components ---
 

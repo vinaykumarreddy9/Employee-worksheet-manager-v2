@@ -186,23 +186,23 @@ if "access_token" not in st.session_state: st.session_state.access_token = None
 
 # --- API Helpers ---
 def api_call(method, endpoint, data=None, params=None):
+    final_url = f"{BACKEND_URL}/{endpoint}"
+    res = None
     try:
-        # Check if we need to append a port for internal Render communication
-        # Render internal hostnames usually need the listening port (8000)
-        final_url = f"{BACKEND_URL}/{endpoint}"
-        
         headers = {}
         if st.session_state.access_token:
             headers["Authorization"] = f"Bearer {st.session_state.access_token}"
             
         if method == "POST":
-            res = requests.post(final_url, json=data, headers=headers, timeout=10)
+            res = requests.post(final_url, json=data, headers=headers, timeout=15)
         else:
-            res = requests.get(final_url, params=params, headers=headers, timeout=10)
+            res = requests.get(final_url, params=params, headers=headers, timeout=15)
         return res
     except Exception as e:
         st.error(f"📡 **API Connection Error:** Could not reach the backend server.")
-        st.info(f"Connecting to: `{BACKEND_URL}`")
+        st.info(f"Connecting to: `{final_url}`")
+        if res is not None:
+            st.warning(f"Status Code: {res.status_code}")
         st.divider()
         print(f"📡 API Connection Error: {e}")
         return None
@@ -225,13 +225,20 @@ def login_ui():
             res = api_call("POST", "auth/login", {"email": email, "password": password})
             if res is not None:
                 if res.status_code == 200:
-                    data = res.json()
-                    st.session_state.user = data["user"]
-                    st.session_state.access_token = data["access_token"]
-                    st.session_state.step = "dashboard"
-                    st.rerun()
+                    try:
+                        data = res.json()
+                        st.session_state.user = data["user"]
+                        st.session_state.access_token = data["access_token"]
+                        st.session_state.step = "dashboard"
+                        st.rerun()
+                    except:
+                        st.error("❌ Invalid response format from server (Expected JSON)")
                 else:
-                    st.error(f"❌ {res.json().get('detail', 'Authentication failed')}")
+                    try:
+                        error_msg = res.json().get('detail', 'Authentication failed')
+                        st.error(f"❌ {error_msg}")
+                    except:
+                        st.error(f"❌ Server returned error {res.status_code}. (Non-JSON response)")
 
 def employee_dashboard():
     # Session State for adding/editing

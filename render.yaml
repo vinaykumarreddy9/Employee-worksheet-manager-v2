@@ -40,4 +40,4 @@ services:
         fromService:
           name: timesheet-backend
           type: web
-          property: hostport
+          property: url

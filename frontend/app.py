@@ -170,6 +170,8 @@ st.markdown("""
 
 # --- Constants & State ---
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+if BACKEND_URL and not BACKEND_URL.startswith("http"):
+    BACKEND_URL = f"http://{BACKEND_URL}"
 
 if "user" not in st.session_state: st.session_state.user = None
 if "step" not in st.session_state: st.session_state.step = "login"

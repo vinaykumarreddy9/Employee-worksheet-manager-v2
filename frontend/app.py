@@ -266,6 +266,51 @@ def login_ui():
                         st.error(f"❌ {error_msg}")
                     except:
                         st.error(f"❌ Server returned error {res.status_code}. (Non-JSON response)")
+        
+        st.markdown('<div style="text-align: center; margin-top: 15px; color: #64748b;">Don\'t have an account?</div>', unsafe_allow_html=True)
+        if st.button("Create New Account", use_container_width=True):
+            st.session_state.step = "register"
+            st.rerun()
+
+def register_ui():
+    header()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.subheader("Create Account")
+        full_name = st.text_input("Full Name", placeholder="John Doe")
+        emp_id = st.text_input("Employee ID", placeholder="EMP-123")
+        role = st.selectbox("Role", ["Employee", "Admin"])
+        email = st.text_input("Work Email", placeholder="name@company.com")
+        password = st.text_input("Password", type="password", placeholder="••••••••")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Sign Up", type="primary", use_container_width=True):
+                if not all([full_name, emp_id, email, password]):
+                    st.error("Please fill in all fields")
+                else:
+                    payload = {
+                        "full_name": full_name,
+                        "employee_id": emp_id,
+                        "role": role,
+                        "email": email,
+                        "password": password
+                    }
+                    res = api_call("POST", "auth/register", payload)
+                    if res and res.status_code == 200:
+                        st.success("✅ Registration successful! Please login.")
+                        time.sleep(1.5)
+                        st.session_state.step = "login"
+                        st.rerun()
+                    elif res:
+                        try:
+                            st.error(f"❌ {res.json().get('detail', 'Registration failed')}")
+                        except:
+                            st.error("❌ Registration failed (Server Error)")
+        with c2:
+            if st.button("Back to Login", use_container_width=True):
+                st.session_state.step = "login"
+                st.rerun()
 
 def employee_dashboard():
     # Session State for adding/editing
@@ -619,6 +664,8 @@ def admin_dashboard():
 # --- Router ---
 if st.session_state.step == "login": 
     login_ui()
+elif st.session_state.step == "register":
+    register_ui()
 elif st.session_state.step == "dashboard":
     if st.session_state.user["role"] == "Admin": 
         admin_dashboard()

@@ -136,6 +136,27 @@ st.markdown("""
         word-break: break-all;
     }
     
+    /* Sidebar Logo Styling */
+    .sidebar-logo-container {
+        display: flex;
+        justify-content: center;
+        margin-top: -20px;
+        margin-bottom: 25px;
+    }
+    .sidebar-logo {
+        width: 120px !important;
+        height: 120px !important;
+        object-fit: cover;
+        border-radius: 50% !important;
+        border: 4px solid rgba(56, 189, 248, 0.3) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.3s ease-in-out;
+    }
+    .sidebar-logo:hover {
+        transform: scale(1.05);
+        border-color: #38bdf8 !important;
+    }
+
     /* Stat Card Component */
     .stat-card {
         background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(37, 99, 235, 0.1));
@@ -383,10 +404,15 @@ def render_sidebar_profile(user_role="Employee"):
     # Logo - Scaled for better professionalism
     logo_path = os.path.join("frontend", "assets", "logo.png")
     if os.path.exists(logo_path):
-        # Use a container to center and size the logo professionally
-        col1, col2, col3 = st.sidebar.columns([1, 4, 1])
-        with col2:
-            st.image(logo_path, width=150)
+        import base64
+        with open(logo_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+        
+        st.sidebar.markdown(f"""
+            <div class="sidebar-logo-container">
+                <img src="data:image/png;base64,{encoded}" class="sidebar-logo">
+            </div>
+        """, unsafe_allow_html=True)
     else:
         # Fallback if image not found
         st.sidebar.markdown("### 🕒 Timesheet Manager")

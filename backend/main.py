@@ -35,6 +35,13 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def startup_event():
+        try:
+            from backend.setup_sheets import setup_spreadsheet
+            logger.info("Running spreadsheet setup...")
+            setup_spreadsheet()
+        except Exception as e:
+            logger.error(f"Spreadsheet setup failed: {e}")
+            
         start_scheduler()
         logger.info("Application started successfully.")
 

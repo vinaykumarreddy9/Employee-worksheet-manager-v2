@@ -30,7 +30,7 @@ async def save_entry(
     hours: float = Body(...),
     project_name: str = Body(...),
     task_description: str = Body(...),
-    work_type: str = Body("Regular Work"),
+    work_type: str = Body("Billable"),
     current_user: dict = Depends(get_current_user)
 ):
     if email != current_user["sub"]:

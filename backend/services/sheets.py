@@ -185,44 +185,66 @@ class SheetManager:
     def get_all_submissions(self):
         sheet = self.get_worksheet("pending")
         records = sheet.get_all_records()
-        return [r for r in records if r["status"] == TimesheetStatus.SUBMITTED]
+        submissions = [r for r in records if r["status"] == TimesheetStatus.SUBMITTED]
+        
+        # Enrich with employee_id
+        try:
+            user_sheet = self.get_worksheet("logins")
+            users = user_sheet.get_all_records()
+            email_to_id = {u['email']: u.get('employee_id', 'Unknown') for u in users}
+            for s in submissions:
+                s['employee_id'] = email_to_id.get(s['email'], 'Unknown')
+        except Exception as e:
+            logger.error(f"Error enriching submissions: {e}")
+            
+        return submissions
 
     def process_timesheet_week(self, email: str, week_start: str, action: str, admin_email: str, reason: str = ""):
-        pending_sheet = self.get_worksheet("pending")
-        records = pending_sheet.get_all_records()
-        
-        week_entries = [r for r in records if r["email"] == email and r["week_start_date"] == week_start]
-        if not week_entries:
-            return False, "No entries found for this week"
-        
-        total_hours = sum(float(r["hours"]) for r in week_entries)
-        ts_id = str(uuid.uuid4())
+        try:
+            pending_sheet = self.get_worksheet("pending")
+            records = pending_sheet.get_all_records()
+            
+            # Find all matching rows
+            # Index 0 in records is row 2 in sheet
+            row_indices = [idx + 2 for idx, r in enumerate(records) 
+                          if r["email"] == email and r["week_start_date"] == week_start]
+            
+            if not row_indices:
+                return False, "No entries found for this week"
+            
+            week_entries = [r for r in records if r["email"] == email and r["week_start_date"] == week_start]
+            total_hours = sum(float(r["hours"]) for r in week_entries)
+            ts_id = str(uuid.uuid4())
 
-        if action == "Approve":
-            approved_sheet = self.get_worksheet("approved")
-            approved_sheet.append_row([
-                ts_id, email, week_start, total_hours, 
-                datetime.now().isoformat(), admin_email
-            ])
-            # Mark pending as Approved
-            for idx, r in enumerate(records):
-                if r["email"] == email and r["week_start_date"] == week_start:
-                    pending_sheet.update_cell(idx + 2, 8, "Approved")
-        else:
-            denied_sheet = self.get_worksheet("denied")
-            denied_sheet.append_row([
-                ts_id, email, week_start, reason, 
-                datetime.now().isoformat(), admin_email
-            ])
-            for idx, r in enumerate(records):
-                if r["email"] == email and r["week_start_date"] == week_start:
-                    pending_sheet.update_cell(idx + 2, 8, "Denied")
+            if action == "Approve":
+                approved_sheet = self.get_worksheet("approved")
+                approved_sheet.append_row([
+                    ts_id, email, week_start, total_hours, 
+                    datetime.now().isoformat(), admin_email
+                ])
+                new_status = "Approved"
+            else:
+                denied_sheet = self.get_worksheet("denied")
+                denied_sheet.append_row([
+                    ts_id, email, week_start, reason, 
+                    datetime.now().isoformat(), admin_email
+                ])
+                new_status = "Denied"
 
-        
-        # ✉️ Send notification email to employee
-        MailService.send_timesheet_status_notification(email, week_start, action, reason)
-        
-        return True, f"Week {action.lower()}d"
+            # Update all matching rows in pending
+            for row_num in row_indices:
+                pending_sheet.update_cell(row_num, 8, new_status)
+            
+            # ✉️ Send notification email to employee (non-blocking failure)
+            try:
+                MailService.send_timesheet_status_notification(email, week_start, action, reason)
+            except Exception as mail_err:
+                logger.error(f"Failed to send status email: {mail_err}")
+            
+            return True, f"Week {action.lower()}d"
+        except Exception as e:
+            logger.error(f"Error processing timesheet week: {e}")
+            return False, f"Internal error: {str(e)}"
 
     # --- Timesheet Management ---
     def update_timesheet_entry(self, entry_id: str, email: str, hours: float, project_name: str, task_description: str, work_type: str):

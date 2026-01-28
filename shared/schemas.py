@@ -23,7 +23,7 @@ class TimesheetStatus(str, Enum):
     DENIED = "Denied"
 
 class WorkType(str, Enum):
-    REGULAR = "Regular Work"
+    REGULAR = "Billable"
     HOLIDAY = "Holiday"
 
 class User(BaseModel):

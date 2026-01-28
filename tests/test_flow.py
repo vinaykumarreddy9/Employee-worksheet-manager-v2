@@ -47,7 +47,7 @@ async def test_full_system_flow():
             "hours": 5.0,
             "project_name": "E2E Project",
             "task_description": "Initial Task",
-            "work_type": "Regular Work"
+            "work_type": "Billable"
         }, headers=headers)
         assert resp.status_code == 200, f"Entry creation failed: {resp.text}"
 
@@ -59,7 +59,7 @@ async def test_full_system_flow():
             "hours": 4.0, # 5 + 4 = 9 (Should fail)
             "project_name": "Overtime",
             "task_description": "Should fail",
-            "work_type": "Regular Work"
+            "work_type": "Billable"
         }, headers=headers)
         assert resp.status_code == 400
         assert "Daily limit exceeded" in resp.json()["detail"]
@@ -78,7 +78,7 @@ async def test_full_system_flow():
             "hours": 8.0, # Change 5 to 8
             "project_name": "Modified Project",
             "task_description": "Updated Task",
-            "work_type": "Regular Work"
+            "work_type": "Billable"
         }, headers=headers)
         assert resp.status_code == 200
         print("Inline Update Successful.")
@@ -93,7 +93,7 @@ async def test_full_system_flow():
             "hours": 1.0,
             "project_name": "Delete Me",
             "task_description": "Garbage",
-            "work_type": "Regular Work"
+            "work_type": "Billable"
         }, headers=headers)
         temp_id = sheet_manager.get_pending_entries(test_email, target_week.isoformat())[-1]["entry_id"]
         
@@ -115,7 +115,7 @@ async def test_full_system_flow():
                 "hours": 8.0,
                 "project_name": "Filling",
                 "task_description": "Work",
-                "work_type": "Regular Work"
+                "work_type": "Billable"
             }, headers=headers)
         
         print("Submitting full week...")
@@ -134,7 +134,7 @@ async def test_full_system_flow():
             "hours": 1.0, 
             "project_name": "Tamper",
             "task_description": "Fraud",
-            "work_type": "Regular Work"
+            "work_type": "Billable"
         }, headers=headers)
         assert resp.status_code == 400
         assert "cannot be modified" in resp.json()["detail"]

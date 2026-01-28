@@ -74,10 +74,12 @@ def setup_spreadsheet():
                 worksheet.resize(cols=len(headers))
                 worksheet.update('A1', [headers])
                 
-        # --- Add Default Admin User if Logins is Empty ---
+        # --- Add Default Admin User if it doesn't exist ---
         login_sheet = spreadsheet.worksheet("User Logins")
-        admins = login_sheet.get_all_records()
-        if not admins:
+        users = login_sheet.get_all_records()
+        admin_exists = any(u.get('email') == "admin@company.com" for u in users)
+        
+        if not admin_exists:
             print("Seeding default Admin user...")
             admin_data = [
                 "admin@company.com", 
@@ -90,6 +92,8 @@ def setup_spreadsheet():
             ]
             login_sheet.append_row(admin_data)
             print("Default credentials: admin@company.com / admin123")
+        else:
+            print("Admin user already exists.")
         
         print("\nSpreadsheet Setup completed successfully!")
         

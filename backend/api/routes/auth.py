@@ -38,8 +38,8 @@ async def register(
 async def login(email: str = Body(...), password: str = Body(...)):
     user = sheet_manager.get_user_by_email(email)
     
-    # Direct comparison for simplicity as requested
-    if not user or user["status"] != UserStatus.ACTIVE or password != user["password_hash"]:
+    # Direct comparison for simplicity; force string type for safety
+    if not user or user["status"] != UserStatus.ACTIVE or str(password) != str(user.get("password_hash")):
         raise HTTPException(status_code=401, detail="Invalid credentials or inactive account")
     
     token = create_access_token({"sub": user["email"], "role": user["role"]})

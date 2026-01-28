@@ -202,12 +202,9 @@ def api_call(method, endpoint, data=None, params=None, retries=5):
             else:
                 res = requests.get(final_url, params=params, headers=headers, timeout=20)
             
-            # Check if this is a valid JSON response
-            # Sometimes Render/Proxies return a 200 OK with an HTML loading page
+            # More flexible JSON check: handle "application/json; charset=utf-8"
             content_type = res.headers.get("Content-Type", "").lower()
-            is_json = "application/json" in content_type
-            
-            if res.status_code == 200 and is_json:
+            if res.status_code == 200 and "application/json" in content_type:
                 return res
             
             # If it's a 200 but not JSON, or a 50x error, it's likely the server waking up
@@ -258,14 +255,18 @@ def login_ui():
                         st.session_state.access_token = data["access_token"]
                         st.session_state.step = "dashboard"
                         st.rerun()
-                    except:
-                        st.error("❌ Invalid response format from server (Expected JSON)")
+                    except Exception as e:
+                        st.error(f"❌ Error processing user data: {str(e)}")
+                        st.info("The server responded with 200 OK but the data was not in the expected format.")
                 else:
                     try:
                         error_msg = res.json().get('detail', 'Authentication failed')
                         st.error(f"❌ {error_msg}")
                     except:
                         st.error(f"❌ Server returned error {res.status_code}. (Non-JSON response)")
+                        try:
+                            st.code(res.text[:200], language="html")
+                        except: pass
         
         st.markdown('<div style="text-align: center; margin-top: 15px; color: #64748b;">Don\'t have an account?</div>', unsafe_allow_html=True)
         if st.button("Create New Account", use_container_width=True):

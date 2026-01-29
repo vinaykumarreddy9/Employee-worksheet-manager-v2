@@ -12,6 +12,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.utils.helpers import get_available_weeks
 
+def safe_float(v):
+    try:
+        return float(v) if v and str(v).strip() else 0.0
+    except:
+        return 0.0
+
 # --- Page Config ---
 st.set_page_config(
     page_title="Timesheet Manager App",
@@ -170,87 +176,78 @@ st.markdown("""
         border-color: rgba(56, 189, 248, 0.5);
         transform: translateY(-2px);
     }
-    .stat-label {
-        color: var(--text-color);
-        opacity: 0.6;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 8px;
+
+    /* --- Hybrid Grid System --- */
+    .ts-grid-container {
+        width: 100%;
+        font-family: 'Inter', sans-serif;
     }
-    .stat-value {
-        color: #38bdf8;
-        font-size: 2.5rem;
+    
+    /* Shared widths for both HTML and st.columns to align vertically */
+    .col-date    { width: 14%; }
+    .col-hours   { width: 9%;  }
+    .col-project { width: 44%; }
+    .col-type    { width: 18%; }
+    .col-action  { width: 15%; }
+
+    /* The HTML Table (Proper structure for Read-Only) */
+    .ts-locked-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        background: white;
+        border: 2px solid #000000;
+    }
+    .ts-locked-table th {
+        background: rgba(0, 0, 0, 0.05);
+        color: #000000;
         font-weight: 700;
-        line-height: 1;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        padding: 14px 10px;
+        border: 1px solid #000000;
+        text-align: center;
     }
-    .stat-unit {
-        font-size: 1rem;
-        color: #64748b;
-        margin-left: 4px;
+    .ts-locked-table td {
+        border: 1px solid #000000;
+        padding: 0px 10px;
+        height: 52px;
+        text-align: center;
+        font-size: 0.95rem;
     }
-    
-    /* Better Table Aesthetics */
-    .stTable {
-        border-radius: 12px !important;
-        overflow: hidden !important;
+    .ts-locked-table tr:nth-child(even) { background: rgba(0,0,0,0.01); }
+
+    /* Streamlit Row Wrapper (for Interactivity) */
+    .ts-edit-row {
+        display: flex;
+        width: 100%;
+        background: white;
+        border-left: 2px solid #000000;
+        border-right: 2px solid #000000;
+        border-bottom: 2px solid #000000;
+        margin-top: -1px; /* Stitching rows together */
     }
-    
-    /* Ensure all elements in a row have the same height and vertical alignment */
-    [data-testid="stVerticalBlock"] > div > div > [data-testid="column"] {
+    .ts-edit-row:hover { background: rgba(56, 189, 248, 0.02); }
+
+    /* Target st.columns inside the row */
+    .ts-edit-row [data-testid="column"] {
+        border-right: 1px solid #000000;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        min-height: 50px !important;
+        padding: 0 !important;
+        height: 52px;
     }
-    
-    /* Standardize height for selectboxes and inputs to prevent layout jumping */
-    .stSelectbox, .stTextInput, .stNumberInput {
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-    }
-    
-    /* Specific styling for the data row boxes */
-    .data-row {
-        background: rgba(120, 120, 120, 0.02);
-        border-radius: 8px;
-        margin-bottom: 4px;
-        transition: all 0.2s ease;
-    }
-    
-    .data-row:hover {
-        background: rgba(56, 189, 248, 0.05);
-    }
-    
-    /* Compact Header */
-    .table-header-text {
-        font-size: 0.75rem !important;
-        font-weight: 600 !important;
-        color: #94a3b8 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.1em !important;
-    }
-    
-    /* Divider Style */
-    hr {
-        margin: 0.2rem 0 !important;
-        border: 0;
-        border-top: 1px solid rgba(120, 120, 120, 0.1) !important;
-    }
-    
-    /* Submit Button refinement */
-    .submit-button-container {
-        margin-top: 20px;
-        padding: 0 20px;
-    }
-    
-    /* Compact Add Button */
-    div.stButton > button[kind="primary"] {
-        height: 38px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        line-height: 38px !important;
-        width: 100% !important;
+    .ts-edit-row [data-testid="column"]:last-child { border-right: none; }
+
+    /* Clean inputs inside the grid */
+    .ts-edit-row input, .ts-edit-row [data-baseweb="select"] {
+        border: none !important;
+        background: transparent !important;
+        text-align: center !important;
+        box-shadow: none !important;
+        height: 48px !important;
+        font-size: 0.95rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -295,7 +292,7 @@ def api_call(method, endpoint, data=None, params=None, retries=5):
                 return res
             
             # If it's a 200 but not JSON, or a 50x error, it's likely the server waking up
-            if (res.status_code == 200 and not is_json) or res.status_code in [502, 503, 504]:
+            if (res.status_code == 200 and "application/json" not in content_type) or res.status_code in [502, 503, 504]:
                 if attempt < retries - 1:
                     wait_time = 2 + attempt # Increasing wait
                     time.sleep(wait_time)
@@ -445,12 +442,13 @@ def render_sidebar_profile(user_role="Employee"):
 def employee_dashboard():
     if "pending_changes" not in st.session_state: st.session_state.pending_changes = []
     if "is_saving" not in st.session_state: st.session_state.is_saving = False
-
-    def safe_float(v):
-        try:
-            return float(v) if v and str(v).strip() else 0.0
-        except:
-            return 0.0
+    if "row_counter" not in st.session_state: st.session_state.row_counter = 0
+    
+    # Initialize dynamic keys for the current counter
+    cnt = st.session_state.row_counter
+    if f"new_hrs_{cnt}" not in st.session_state: st.session_state[f"new_hrs_{cnt}"] = "8.0"
+    if f"new_proj_{cnt}" not in st.session_state: st.session_state[f"new_proj_{cnt}"] = ""
+    if f"new_type_{cnt}" not in st.session_state: st.session_state[f"new_type_{cnt}"] = "Billable"
 
     # Structured Sidebar Profile
     render_sidebar_profile("Employee")
@@ -464,6 +462,16 @@ def employee_dashboard():
     st.title("Employee Dashboard")
     
     # --- Period Selection (Past 4 Weeks) ---
+    def on_entry_change(e_id, field):
+        if field == "type":
+            if st.session_state.get(f"type_{e_id}") == "Holiday":
+                st.session_state[f"hrs_{e_id}"] = "8.0"
+
+    def on_new_type_change():
+        cnt = st.session_state.row_counter
+        if st.session_state.get(f"new_type_{cnt}") == "Holiday":
+            st.session_state[f"new_hrs_{cnt}"] = "8.0"
+
     available_weeks = get_available_weeks()
     week_options = {w.isoformat(): f"Week of {w.strftime('%B %d, %Y')}" for w in available_weeks}
     
@@ -479,10 +487,10 @@ def employee_dashboard():
     # Clear old row keys when week changes
     if "last_week" not in st.session_state: st.session_state.last_week = selected_week_str
     if st.session_state.last_week != selected_week_str:
-        # Clear all type_, hrs_, proj_ keys
-        keys_to_clear = [k for k in st.session_state.keys() if k.startswith(("type_", "hrs_", "proj_"))]
+        keys_to_clear = [k for k in st.session_state.keys() if k.startswith(("type_", "hrs_", "proj_", "new_"))]
         for k in keys_to_clear: del st.session_state[k]
         st.session_state.pending_changes = []
+        st.session_state.row_counter = 0
         st.session_state.last_week = selected_week_str
     
     # Fetch entries for selected week
@@ -503,144 +511,166 @@ def employee_dashboard():
         st.error(f"❌ Error parsing timesheet data")
         return
     week_start_date = datetime.strptime(selected_week_str, "%Y-%m-%d").date()
-    
     # Check if week is locked (Submitted or Approved)
     is_locked = any(e['status'] in ['Submitted', 'Approved'] for e in entries)
     
-    # Calculate totals
-    total_h = sum(float(e['hours']) for e in entries) if entries else 0.0
-
-    # --- Weekly Summary Table (Live Grid) ---
+    # Calculate totals including pending changes
+    display_entries = entries + st.session_state.pending_changes
+    current_total = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_entries)
+    billable_h = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_entries if st.session_state.get(f"type_{e['entry_id']}", e.get('work_type')) == 'Billable')
+    holiday_h = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_entries if st.session_state.get(f"type_{e['entry_id']}", e.get('work_type')) == 'Holiday')
     
-    # Wrap in centered container
+    # --- Metrics Row ---
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total Hours", f"{current_total:.1f} hrs", delta=f"{current_total-40:.1f}" if current_total >= 40 else f"{current_total-40:.1f}", delta_color="normal")
+    with m2:
+        status_color = "🟢" if is_locked else "🟠"
+        st.metric("Status", "Locked" if is_locked else "Editable", help="Locked means the week is Submitted or Approved.")
+    with m3:
+        st.metric("Billable", f"{billable_h:.1f} hrs")
+    with m4:
+        st.metric("Holiday", f"{holiday_h:.1f} hrs")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- Weekly Activities (Table) ---
     main_col1, main_col2, main_col3 = st.columns([1, 10, 1])
     
     with main_col2:
-        # Table Header
-        header_cols = st.columns([1.5, 0.8, 3.2, 1.5, 1])
-        headers = ["Date", "Hours", "Project Description", "Work Type", ""]
-        for col, h in zip(header_cols, headers):
-            col.markdown(f"<div style='text-align: center; color: #64748b; font-size: 0.95rem; font-weight: 600; margin-bottom: -5px;'>{h.upper()}</div>", unsafe_allow_html=True)
-        st.markdown("<hr style='margin: 0.8rem 0 0.5rem 0; opacity: 0.15;'>", unsafe_allow_html=True)
-
-        # Define update callback
-        def on_entry_change(e_id, field):
-            # Instead of API call, we just mark as modified and let the UI refresh
-            # The actual values are read from st.session_state in the loop
-            pass
-
-        # Combine official entries with draft changes for display
+        # Prepare data
         display_list = entries + st.session_state.pending_changes
-        # Sort display entries by date
         sorted_display = sorted(display_list, key=lambda x: x['date'])
 
-        for entry in sorted_display:
-            row_id = entry['entry_id']
-            is_draft = entry.get('status') == 'Draft'
-            cols = st.columns([1.5, 0.8, 3.2, 1.5, 1])
+        available_for_new = []
+        if not is_locked:
+            mon_to_fri_all = [week_start_date + timedelta(days=i) for i in range(5)]
+            for d in mon_to_fri_all:
+                daily_total = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_list if e['date'] == d.isoformat())
+                if daily_total < 8.0: available_for_new.append(d)
+        
+        # --- RENDER TABLE ---
+        if is_locked:
+            # Everything as HTML table for perfect stability
+            html_rows = []
+            for entry in sorted_display:
+                date_fmt = datetime.strptime(entry['date'], "%Y-%m-%d").strftime("%a, %b %d")
+                html_rows.append(f"<tr><td>{date_fmt}</td><td>{entry['hours']} hrs</td><td>{entry['project_name']}</td><td>{entry.get('work_type', 'Billable')}</td><td>🔒</td></tr>")
             
+            st.markdown(f"""
+            <table class='ts-locked-table'>
+                <thead>
+                    <tr>
+                        <th class='col-date'>DATE</th><th class='col-hours'>HOURS</th><th class='col-project'>PROJECT DESCRIPTION</th><th class='col-type'>WORK TYPE</th><th class='col-action'>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>{''.join(html_rows)}</tbody>
+            </table>
+            """, unsafe_allow_html=True)
+        else:
+            # Header Only as HTML
+            st.markdown("""
+            <table class='ts-locked-table' style='border-bottom: none;'>
+                <thead>
+                    <tr>
+                        <th class='col-date'>DATE</th><th class='col-hours'>HOURS</th><th class='col-project'>PROJECT DESCRIPTION</th><th class='col-type'>WORK TYPE</th><th class='col-action'>ACTION</th>
+                    </tr>
+                </thead>
+            </table>
+            """, unsafe_allow_html=True)
             
-            if is_locked:
-                cols[0].markdown(f"<div style='text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; height: 100%;'>{datetime.strptime(entry['date'], '%Y-%m-%d').strftime('%a, %b %d')}</div>", unsafe_allow_html=True)
-                cols[1].markdown(f"<div style='text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; height: 100%;'>{entry['hours']} hrs</div>", unsafe_allow_html=True)
-                cols[2].markdown(f"<div style='text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; height: 100%;'>{entry['project_name']}</div>", unsafe_allow_html=True)
-                cols[3].markdown(f"<div style='text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; height: 100%;'>{entry.get('work_type', 'Billable')}</div>", unsafe_allow_html=True)
-                cols[4].markdown(f"<div style='text-align: center; display: flex; align-items: center; justify-content: center; height: 100%;'></div>", unsafe_allow_html=True)
-            else:
-                # --- Live Edit Mode ---
-                mon_to_fri = [week_start_date + timedelta(days=i) for i in range(5)]
-                curr_date = datetime.strptime(entry['date'], "%Y-%m-%d").date()
-                
-                # Filter dates
-                available_dates = []
-                for d in mon_to_fri:
-                    daily_total = sum(float(e['hours']) for e in entries if e['date'] == d.isoformat())
-                    if d == curr_date or daily_total < 8.0:
-                        available_dates.append(d)
-                
-                # Date Select
-                cols[0].markdown(f"<div style='text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; height: 100%;'>{datetime.strptime(entry['date'], '%Y-%m-%d').strftime('%a, %b %d')}</div>", unsafe_allow_html=True)
-                
-                # Type Select
-                # Initialize session state for all rows (entries AND drafts)
+            # Rows using st.columns (Synchronized with CSS)
+            col_weights = [1.4, 0.9, 4.4, 1.8, 1.5]
+            
+            for entry in sorted_display:
+                row_id = entry['entry_id']
+                # Store state
                 if f"type_{row_id}" not in st.session_state: st.session_state[f"type_{row_id}"] = entry.get('work_type', 'Billable')
                 if f"hrs_{row_id}" not in st.session_state: st.session_state[f"hrs_{row_id}"] = str(entry['hours'])
                 if f"proj_{row_id}" not in st.session_state: st.session_state[f"proj_{row_id}"] = entry['project_name']
 
-                type_options = ["Billable", "Holiday"]
-                cols[3].selectbox("Type", options=type_options, 
-                                 key=f"type_{row_id}", label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "type"))
-                
-                is_holiday = st.session_state[f"type_{row_id}"] == "Holiday"
-                
-                if is_holiday:
-                    cols[1].markdown("<div style='text-align: center; font-weight: bold; display: flex; align-items: center; justify-content: center; height: 100%;'>8.0</div>", unsafe_allow_html=True)
-                    cols[2].markdown("<div style='text-align: center; font-style: italic; display: flex; align-items: center; justify-content: center; height: 100%;'>Holiday</div>", unsafe_allow_html=True)
-                else:
-                    cols[1].text_input("Hrs", key=f"hrs_{row_id}", 
-                                     label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "hrs"))
-                    cols[2].text_input("Project", key=f"proj_{row_id}", 
-                                      label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "proj"))
-                
+                st.markdown("<div class='ts-edit-row'>", unsafe_allow_html=True)
+                cols = st.columns(col_weights)
+                date_fmt = datetime.strptime(entry['date'], "%Y-%m-%d").strftime("%a, %b %d")
+                cols[0].write(date_fmt)
+                with cols[1]:
+                    is_holiday = st.session_state.get(f"type_{row_id}") == "Holiday"
+                    st.text_input("Hrs", key=f"hrs_{row_id}", label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "hrs"), disabled=is_holiday)
+                with cols[2]:
+                    st.text_input("Proj", key=f"proj_{row_id}", label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "proj"))
+                with cols[3]:
+                    st.selectbox("Type", options=["Billable", "Holiday"], key=f"type_{row_id}", label_visibility="collapsed", on_change=on_entry_change, args=(row_id, "type"))
+                cols[4].write("") 
+                st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("<hr style='margin: 0.2rem 0; opacity: 0.1;'>", unsafe_allow_html=True)
-
-        # --- New Row Area ---
-        if not is_locked:
-            mon_to_fri_all = [week_start_date + timedelta(days=i) for i in range(5)]
-            available_for_new = []
-            for d in mon_to_fri_all:
-                daily_total = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_list if e['date'] == d.isoformat())
-                if daily_total < 8.0:
-                    available_for_new.append(d)
-
+            # Add New Row
             if available_for_new:
-                cols = st.columns([1.5, 0.8, 3.2, 1.5, 1])
-                new_date = cols[0].selectbox("Date", options=available_for_new, format_func=lambda x: x.strftime("%a, %b %d"), key="new_date", label_visibility="collapsed")
-                new_type = cols[3].selectbox("Type", options=["Billable", "Holiday"], key="new_type", label_visibility="collapsed")
-                
-                if new_type == "Holiday":
-                    new_hours = "8.0"
-                    new_proj = "Holiday"
-                    cols[1].markdown("<div style='text-align: center; display: flex; align-items: center; justify-content: center; height: 100%;'>8.0</div>", unsafe_allow_html=True)
-                    cols[2].markdown("<div style='text-align: center; display: flex; align-items: center; justify-content: center; height: 100%;'>Holiday</div>", unsafe_allow_html=True)
-                else:
-                    new_hours = cols[1].text_input("Hrs", value="8.0", key="new_hrs", label_visibility="collapsed")
-                    new_proj = cols[2].text_input("Project", placeholder="Task...", key="new_proj", label_visibility="collapsed")
-                
-                if cols[4].button("Add", key="add_btn", type="primary", use_container_width=True):
-                    if not new_proj and new_type != "Holiday":
-                        st.error("Project required")
-                    else:
-                        try:
-                            h_val = float(new_hours)
-                            if h_val <= 0:
-                                st.error("Hours must be > 0")
-                                return
-                        except:
-                            st.error("Invalid hours")
-                            return
+                cnt = st.session_state.row_counter
+                st.markdown("<div class='ts-edit-row' style='background: rgba(0,0,0,0.02);'>", unsafe_allow_html=True)
+                new_cols = st.columns(col_weights)
+                with new_cols[0]:
+                    st.selectbox("Date", options=available_for_new, format_func=lambda x: x.strftime("%a, %b %d"), key=f"new_date_{cnt}", label_visibility="collapsed")
+                with new_cols[1]:
+                    is_new_holiday = st.session_state.get(f"new_type_{cnt}") == "Holiday"
+                    st.text_input("NewHrs", key=f"new_hrs_{cnt}", label_visibility="collapsed", disabled=is_new_holiday)
+                with new_cols[2]:
+                    st.text_input("NewProj", placeholder="Project detail...", key=f"new_proj_{cnt}", label_visibility="collapsed")
+                with new_cols[3]:
+                    st.selectbox("NewType", options=["Billable", "Holiday"], key=f"new_type_{cnt}", label_visibility="collapsed", on_change=on_new_type_change)
+                with new_cols[4]:
+                    if st.button("Add", key="add_btn", type="primary", use_container_width=True):
+                        # Extract and validate inputs
+                        raw_h = st.session_state.get(f"new_hrs_{cnt}", "0").strip()
+                        raw_p = st.session_state.get(f"new_proj_{cnt}", "").strip()
+                        raw_t = st.session_state.get(f"new_type_{cnt}", "Billable")
+                        new_dt = st.session_state.get(f"new_date_{cnt}")
 
-                        # Append to pending changes instead of API call
-                        new_draft = {
-                            "entry_id": f"draft_{uuid.uuid4().hex[:8]}",
-                            "email": st.session_state.user['email'],
-                            "date": new_date.isoformat(),
-                            "hours": h_val,
-                            "project_name": new_proj,
-                            "task_description": new_proj,
-                            "work_type": new_type,
-                            "status": "Draft"
-                        }
-                        st.session_state.pending_changes.append(new_draft)
-                        st.rerun()
+                        if not raw_p and raw_t != "Holiday":
+                            st.error("Project description is required for billable work.")
+                        elif not raw_h:
+                            st.error("Please enter hours worked.")
+                        else:
+                            try:
+                                h_val = float(raw_h)
+                                if h_val <= 0:
+                                    st.error("Hours must be greater than 0.")
+                                    st.stop()
+                                
+                                # Check daily limit
+                                dt_str = new_dt.isoformat()
+                                day_total = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) 
+                                               for e in display_list if e['date'] == dt_str)
+                                
+                                if day_total + h_val > 8.01:
+                                    st.error(f"Cannot exceed 8 hours per day. Current total for {new_dt.strftime('%b %d')}: {day_total} hrs.")
+                                    st.stop()
+
+                                # Success - Create Draft
+                                new_draft = {
+                                    "entry_id": f"draft_{uuid.uuid4().hex[:8]}",
+                                    "email": st.session_state.user['email'],
+                                    "date": dt_str,
+                                    "hours": h_val,
+                                    "project_name": raw_p,
+                                    "task_description": raw_p,
+                                    "work_type": raw_t,
+                                    "status": "Draft"
+                                }
+                                st.session_state.pending_changes.append(new_draft)
+                                
+                                # Increment counter to reset widgets
+                                st.session_state.row_counter += 1
+                                st.rerun()
+                                
+                            except ValueError:
+                                st.error(f"'{raw_h}' is not a valid number for hours.")
+                            except Exception as e:
+                                st.error(f"An unexpected error occurred: {str(e)}")
+                st.markdown("</div>", unsafe_allow_html=True)
 
         # Combine official entries with draft changes for display
         display_entries = sorted(entries + st.session_state.pending_changes, key=lambda x: x['date'])
-        # Re-calculate total with drafts
-        # Re-calculate total with drafts and session state overrides
-        total_h = sum(safe_float(st.session_state.get(f"hrs_{e['entry_id']}", e['hours'])) for e in display_entries)
-
+        
         st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.2;'>", unsafe_allow_html=True)
 
         # --- Finalize & Submit ---
@@ -653,20 +683,31 @@ def employee_dashboard():
             for entry in sorted_display:
                 e_id = entry['entry_id']
                 d_str = entry['date']
+                d_fmt = datetime.strptime(d_str, "%Y-%m-%d").strftime("%a, %b %d")
                 
-                # Get current hours from session state
-                raw_h = st.session_state.get(f"hrs_{e_id}", str(entry['hours']))
+                # Get current values from session state
+                curr_h = st.session_state.get(f"hrs_{e_id}", str(entry['hours']))
+                curr_p = st.session_state.get(f"proj_{e_id}", entry['project_name'])
+                curr_t = st.session_state.get(f"type_{e_id}", entry.get('work_type', 'Billable'))
+                
+                # 1. Project Check
+                if not curr_p.strip() and curr_t != "Holiday":
+                    validation_errors.append(f"Project Description is missing for {d_fmt}")
+                
+                # 2. Hours Numeric Check
                 try:
-                    h_val = float(raw_h)
-                    if h_val < 0: validation_errors.append(f"Negative hours on {d_str}")
+                    h_val = float(curr_h)
+                    if h_val <= 0:
+                        validation_errors.append(f"Hours must be > 0 for {d_fmt}")
                     daily_totals[d_str] = daily_totals.get(d_str, 0.0) + h_val
                 except:
-                    validation_errors.append(f"Invalid numeric value for {d_str}")
+                    validation_errors.append(f"Invalid numeric value for hours on {d_fmt}")
 
             # Check daily limits
             for d_str, total in daily_totals.items():
-                if total > 8.01: # Small epsilon for float math
-                    validation_errors.append(f"Total hours for {d_str} ({total} hrs) exceeds 8.0 limit")
+                if total > 8.01:
+                    d_fmt = datetime.strptime(d_str, "%Y-%m-%d").strftime("%a, %b %d")
+                    validation_errors.append(f"Total hours for {d_fmt} ({total} hrs) exceeds 8.0 limit")
 
             if validation_errors:
                 for err in validation_errors:
@@ -701,7 +742,10 @@ def employee_dashboard():
                     })
             
             can_save = (has_pending or modified_existing) and not validation_errors
-            if save_col.button("💾 Save", type="primary", use_container_width=True, disabled=not can_save):
+            
+            save_btn_help = "Resolution of all errors is required to save." if validation_errors else "Save all draft changes to the database."
+            
+            if save_col.button("💾 Save", type="primary", use_container_width=True, disabled=not can_save, help=save_btn_help):
                 with st.spinner("Saving..."):
                     success = True
                     # 1. Save modified existing entries
@@ -730,11 +774,11 @@ def employee_dashboard():
                     else:
                         st.error("Some changes failed to save.")
 
-            # Submit Button
-            can_submit = total_h >= 40.0 and not has_pending and not modified_existing
+            # Submit Button (current_total is used for the 40h check)
+            can_submit = current_total >= 40.0 and not has_pending and not modified_existing
             if submit_col.button("🚀 Submit", type="primary" if can_submit else "secondary", 
                                  use_container_width=True, disabled=not can_submit,
-                                 help="Save all changes and reach 40.0 hours to enable."):
+                                 help="Save all changes first. Requires a total of 40.0 hours to enable."):
                 st.session_state.confirm_submit = True
 
             if st.session_state.get('confirm_submit'):
@@ -789,22 +833,33 @@ def admin_dashboard():
                 emp_id = row['employee_id']
                 w_start = row['week_start_date']
                 w_end = (datetime.fromisoformat(w_start) + timedelta(days=6)).date().isoformat()
-                
                 with st.expander(f"Employee ID: **{emp_id}** ({w_start} to {w_end})"):
                     week_entries = df[(df['email'] == email) & (df['week_start_date'] == w_start)]
                     
                     # Display entries in a professional table
-                    display_df = week_entries[['date', 'project_name', 'work_type', 'hours']].copy()
-                    display_df.columns = ['Date', 'Project Detail', 'Work Type', 'Hours']
-                    st.table(display_df)
+                    html_rows = []
+                    for _, entry in week_entries.iterrows():
+                        date_fmt = datetime.fromisoformat(entry['date']).strftime("%a, %b %d") if isinstance(entry['date'], str) else entry['date'].strftime("%a, %b %d")
+                        html_rows.append(f"<tr><td>{date_fmt}</td><td>{entry['hours']} hrs</td><td>{entry['project_name']}</td><td>{entry['work_type']}</td></tr>")
                     
-                    st.markdown(f"**Total Hours for Week:** `{row['hours']} hrs`")
+                    st.markdown(f"""
+                    <table class='ts-locked-table'>
+                        <thead>
+                            <tr>
+                                <th class='col-date'>DATE</th><th class='col-hours'>HOURS</th><th class='col-project'>PROJECT DETAIL</th><th class='col-type'>WORK TYPE</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(html_rows)}</tbody>
+                    </table>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"<div style='margin-top: 10px; font-weight: 600;'>Total Hours for Week: <span style='color: #38bdf8;'>{row['hours']} hrs</span></div>", unsafe_allow_html=True)
                     st.divider()
 
                     # Action Buttons
                     b1, b2 = st.columns(2)
                     
-                    if b1.button("✅ Approve", key=f"appts_{email}_{w_start}", width="stretch"):
+                    if b1.button("✅ Approve", key=f"appts_{email}_{w_start}", use_container_width=True):
                         res = api_call("POST", "admin/timesheets/process", {
                             "email": email, "week_start": w_start,
                             "action": "Approve", "admin_email": st.session_state.user['email'], "reason": "Approved"
@@ -823,7 +878,7 @@ def admin_dashboard():
                                     with st.expander("Debug Info"):
                                         st.code(res.text[:500])
 
-                    if b2.button("❌ Reject", key=f"rejts_{email}_{w_start}", width="stretch", type="secondary"):
+                    if b2.button("❌ Reject", key=f"rejts_{email}_{w_start}", use_container_width=True, type="secondary"):
                         st.session_state.reject_target = {"email": email, "week_start": w_start}
                         st.rerun()
 
@@ -835,7 +890,7 @@ def admin_dashboard():
         reason = st.text_area("Notes for Employee", placeholder="e.g. Please clarify project details for Monday...")
         
         c1, c2 = st.columns(2)
-        if c1.button("Send Back", type="primary", width="stretch"):
+        if c1.button("Send Back", type="primary", use_container_width=True):
             if not reason:
                 st.error("Please provide a reason")
             else:
@@ -858,7 +913,7 @@ def admin_dashboard():
                             with st.expander("Debug Info"):
                                 st.code(res.text[:500])
         
-        if c2.button("Cancel", width="stretch"):
+        if c2.button("Cancel", use_container_width=True):
             del st.session_state.reject_target
             st.rerun()
 

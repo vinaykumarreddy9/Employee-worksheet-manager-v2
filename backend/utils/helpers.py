@@ -13,7 +13,7 @@ def get_available_weeks() -> list:
     """Returns exactly the past 4 weeks before the current week."""
     current_start = get_current_week_start()
     weeks = []
-    # Get weeks starting from current week down to 4 weeks ago
-    for i in range(0, 5):
+    # Get weeks starting from 1 week ago down to 4 weeks ago
+    for i in range(1, 5):
         weeks.append(current_start - timedelta(days=7 * i))
     return weeks

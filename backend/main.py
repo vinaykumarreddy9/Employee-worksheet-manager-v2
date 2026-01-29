@@ -45,6 +45,10 @@ def create_app() -> FastAPI:
         start_scheduler()
         logger.info("Application started successfully.")
 
+    @app.get("/")
+    async def root():
+        return {"message": "Timesheet Manager API is running!"}
+
     @app.get("/health")
     async def health_check():
         return {"status": "healthy", "timestamp": datetime.now().isoformat()}

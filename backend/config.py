@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
     MAX_DAILY_HOURS: float = 8.0
     SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-for-dev")
-    BACKEND_PORT: int = 8000
+    # Prioritize PORT from env (Render/Heroku standard)
+    BACKEND_PORT: int = int(os.getenv("PORT", 8000))
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
     
     # SMTP Config

@@ -16,14 +16,14 @@ async def register(
     employee_id: str = Body(...)
 ):
     # Check if user already exists
-    if db_manager.get_user_by_email(email):
+    if await db_manager.get_user_by_email(email):
         raise HTTPException(status_code=400, detail="User with this email already exists")
     
     # Check if employee ID exists
-    if db_manager.get_user_by_employee_id(employee_id):
+    if await db_manager.get_user_by_employee_id(employee_id):
         raise HTTPException(status_code=400, detail="Employee ID already registered")
 
-    db_manager.add_user(
+    await db_manager.add_user(
         email=email,
         password_hash=password, # As requested: no hashing
         role=role,
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 async def login(email: str = Body(...), password: str = Body(...)):
     logger.info(f"Login attempt for: {email}")
     try:
-        user = db_manager.get_user_by_email(email)
+        user = await db_manager.get_user_by_email(email)
         
         if not user:
             logger.warning(f"Login failed: User {email} not found")

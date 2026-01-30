@@ -20,7 +20,7 @@ async def get_current_timesheet(email: str, week_start: Optional[str] = None, cu
     else:
         w_start = datetime.strptime(week_start, "%Y-%m-%d").date()
         
-    entries = db_manager.get_pending_entries(email, w_start.isoformat())
+    entries = await db_manager.get_pending_entries(email, w_start.isoformat())
     return {"week_start": w_start.isoformat(), "entries": entries}
 
 @router.post("/entry")
@@ -59,7 +59,7 @@ async def save_entry(
         updated_at=datetime.now()
     )
     
-    success, message = db_manager.save_timesheet_entry(entry)
+    success, message = await db_manager.save_timesheet_entry(entry)
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
@@ -77,7 +77,7 @@ async def update_entry(
     if email != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    success, message = db_manager.update_timesheet_entry(entry_id, email, hours, project_name, task_description, work_type)
+    success, message = await db_manager.update_timesheet_entry(entry_id, email, hours, project_name, task_description, work_type)
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}
@@ -86,7 +86,7 @@ async def update_entry(
 async def submit_timesheet(email: str = Body(...), week_start: str = Body(...), current_user: dict = Depends(get_current_user)):
     if email != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    success = db_manager.submit_week(email, week_start)
+    success = await db_manager.submit_week(email, week_start)
     if not success:
         raise HTTPException(status_code=400, detail="No draft entries found to submit")
     return {"message": "Week submitted successfully"}
@@ -100,7 +100,7 @@ async def delete_entry(
     if email != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    success, message = db_manager.delete_timesheet_entry(entry_id, email)
+    success, message = await db_manager.delete_timesheet_entry(entry_id, email)
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"message": message}

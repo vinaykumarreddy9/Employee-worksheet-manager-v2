@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import auth, timesheets, admin
-from backend.core.scheduler import start_scheduler
 from backend.config import settings
 from datetime import datetime
 import logging
@@ -37,8 +36,8 @@ def create_app() -> FastAPI:
     async def startup_event():
         from backend.database.db_config import engine
         from backend.database.models import Base
-        Base.metadata.create_all(bind=engine)
-        start_scheduler()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
         logger.info("Application started successfully.")
 
     @app.get("/")

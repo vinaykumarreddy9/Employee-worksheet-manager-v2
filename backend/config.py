@@ -12,11 +12,4 @@ class Settings(BaseSettings):
     BACKEND_PORT: int = int(os.getenv("PORT", 8000))
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
     
-    # SMTP Config
-    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 465))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-    SYSTEM_EMAIL: str = os.getenv("SYSTEM_EMAIL", "")
-    
 settings = Settings()

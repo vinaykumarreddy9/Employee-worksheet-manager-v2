@@ -1,9 +1,4 @@
-import random
-import string
 from datetime import date, timedelta
-
-def generate_otp_code(length: int = 6) -> str:
-    return ''.join(random.choices(string.digits, k=length))
 
 def get_current_week_start() -> date:
     today = date.today()

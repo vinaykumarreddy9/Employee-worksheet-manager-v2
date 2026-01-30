@@ -49,17 +49,6 @@ def create_app() -> FastAPI:
     async def health_check():
         return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-    @app.get("/debug/env")
-    async def debug_env():
-        import os
-        return {
-            "DATABASE_URL_SET": bool(os.getenv("DATABASE_URL")),
-            "SECRET_KEY_SET": bool(os.getenv("SECRET_KEY")),
-            "BACKEND_URL": os.getenv("BACKEND_URL"),
-            "SMTP_USER_SET": bool(os.getenv("SMTP_USER")),
-            "PORT": os.getenv("PORT")
-        }
-
     return app
 
 app = create_app()

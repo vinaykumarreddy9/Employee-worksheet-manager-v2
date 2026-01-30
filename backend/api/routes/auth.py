@@ -34,21 +34,44 @@ async def register(
     
     return {"message": "User registered successfully"}
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @router.post("/login")
 async def login(email: str = Body(...), password: str = Body(...)):
+    logger.info(f"Login attempt for: {email}")
     try:
         user = db_manager.get_user_by_email(email)
         
-        # Direct comparison for simplicity; force string type for safety
-        if not user or user["status"] != UserStatus.ACTIVE or str(password) != str(user.get("password_hash")):
-            raise HTTPException(status_code=401, detail="Invalid credentials or inactive account")
+        if not user:
+            logger.warning(f"Login failed: User {email} not found")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+        if user.get("status") != UserStatus.ACTIVE:
+            logger.warning(f"Login failed: User {email} is inactive")
+            raise HTTPException(status_code=401, detail="Account is inactive")
+
+        # Direct comparison for simplicity (no hashing as per current requirement)
+        stored_password = str(user.get("password_hash", ""))
+        if str(password) != stored_password:
+            logger.warning(f"Login failed: Password mismatch for {email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        token = create_access_token({"sub": user["email"], "role": user["role"]})
-        return {"status": "success", "access_token": token, "user": user}
+        logger.info(f"Password verified for {email}. Creating token...")
+        
+        try:
+            token = create_access_token({"sub": user["email"], "role": user["role"]})
+            logger.info(f"Token created successfully for {email}")
+            return {"status": "success", "access_token": token, "user": user}
+        except Exception as jwt_err:
+            logger.error(f"JWT Creation Error for {email}: {jwt_err}")
+            raise HTTPException(status_code=500, detail="Error generating sequence token")
+
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"UNEXPECTED LOGIN ERROR for {email}: {e}")
         import traceback
-        error_msg = f"Backend Crash: {str(e)}\n{traceback.format_exc()}"
-        print(error_msg)
-        raise HTTPException(status_code=500, detail=f"Database or Login logic failed: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))

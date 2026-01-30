@@ -255,6 +255,9 @@ st.markdown("""
 # --- Constants & State ---
 BACKEND_URL = os.getenv("BACKEND_URL")
 
+if not BACKEND_URL:
+    st.error("BACKEND_URL is not set. Contact admin.")
+    st.stop()
 # If on Render, the internal host/port might still fail if not reachable. 
 # We'll handle this in the api_call with better error reporting.
 

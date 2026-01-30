@@ -9,26 +9,42 @@ logger = logging.getLogger(__name__)
 class MailService:
     @staticmethod
     def _send_email(email: str, subject: str, html_content: str):
+        # 1. Validation and Developer Mode
         if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-            logger.warning(f"--- DEVELOPER MODE --- Email to {email} | Subject: {subject}")
-            logger.info(f"Content Body: {html_content[:200]}...")
-            return True, "Success (Developer Mode)"
+            logger.warning(f"⚠️ [SMTP] MAIL SERVICE IN DEVELOPER MODE - NO CREDENTIALS FOUND.")
+            logger.info(f"Recipient: {email} | Subject: {subject}")
+            return True, "Dev Mode (No Mail Sent)"
 
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = f"Timesheet Manager <{settings.SYSTEM_EMAIL}>"
+            msg["From"] = f"Timesheet Manager <{settings.SYSTEM_EMAIL or settings.SMTP_USER}>"
             msg["To"] = email
             msg.attach(MIMEText(html_content, "html"))
 
-            with smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.send_message(msg)
+            logger.info(f"📧 [SMTP] Attempting to send email to {email} via {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
+
+            # 2. Logic to handle both Port 465 (SSL) and 587 (STARTTLS)
+            if int(settings.SMTP_PORT) == 465:
+                # Direct SSL (Legacy but safe for many)
+                with smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=15) as server:
+                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    server.send_message(msg)
+            else:
+                # STARTTLS (Port 587 or others)
+                with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=15) as server:
+                    server.starttls()
+                    server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    server.send_message(msg)
             
-            logger.info(f"Email sent successfully to {email}")
+            logger.info(f"✅ [SMTP] Email sent successfully to {email}")
             return True, "Success"
+        except smtplib.SMTPAuthenticationError:
+            err = "SMTP Authentication Failed. Check your App Password."
+            logger.error(f"❌ [SMTP] {err}")
+            return False, err
         except Exception as e:
-            logger.error(f"Failed to send email to {email}: {str(e)}")
+            logger.error(f"❌ [SMTP] Failed to send email to {email}: {str(e)}")
             return False, str(e)
 
 

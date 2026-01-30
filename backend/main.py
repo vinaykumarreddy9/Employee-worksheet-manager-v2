@@ -49,6 +49,15 @@ def create_app() -> FastAPI:
     async def health_check():
         return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+    # Silent handlers for Streamlit internal checks to clean up logs
+    @app.get("/_stcore/health")
+    async def st_health():
+        return {"status": "ok"}
+
+    @app.get("/_stcore/host-config")
+    async def st_host_config():
+        return {"allowedOrigins": ["*"]}
+
     return app
 
 app = create_app()

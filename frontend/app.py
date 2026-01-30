@@ -253,7 +253,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Constants & State ---
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("BACKEND_URL", "https://worksheet-manager-backend-v2.onrender.com")
 
 # If BACKEND_URL is provided as a hostname:port (Render internal), add http://
 if BACKEND_URL and not BACKEND_URL.startswith("http"):

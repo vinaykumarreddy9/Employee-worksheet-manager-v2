@@ -14,10 +14,10 @@ if not exist "venv\Scripts\activate" (
 )
 
 echo [1/2] Starting FastAPI Backend on http://localhost:8000...
-start "Timesheet Backend" cmd /k "call venv\Scripts\activate && set PYTHONPATH=. && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+start "Timesheet Backend" cmd /k "call venv\Scripts\activate && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
 
 echo [2/2] Starting Streamlit Frontend on http://localhost:8501...
-start "Timesheet Frontend" cmd /k "call venv\Scripts\activate && set PYTHONPATH=. && streamlit run frontend/app.py"
+start "Timesheet Frontend" cmd /k "call venv\Scripts\activate && streamlit run frontend/app.py"
 
 echo.
 echo ===================================================

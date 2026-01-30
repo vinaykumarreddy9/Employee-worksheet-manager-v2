@@ -1,46 +1,49 @@
 # Employee Weekly Timesheet Manager
 
-A professional, streamlined timesheet management system built with Python, FastAPI, Streamlit, and Google Spreadsheets. Optimized for speed, reliability, and ease of use.
+A professional, streamlined timesheet management system built with Python, FastAPI, Streamlit, and PostgreSQL (Neon). Optimized for speed, reliability, and ease of use.
 
 ## Key Features
 
 - **Simplified Authentication**: Direct login with plain-text password comparison (configurable for production) and JWT session security.
-- **Live Grid Editing**: A seamless, "Google Sheets-like" interface for employees to log hours. Changes are auto-synced to the backend.
+- **Live Grid Editing**: A seamless, professional interface for employees to log hours. Changes are auto-synced to the backend.
 - **Automated Validation**: Strict enforcement of daily (max 8h) and weekly (max 40h) limits.
 - **Correction Workflow**: Admins can "Send Back" timesheets for corrections, unlocking them for employee editing and resubmission.
 - **Admin Dashboard**: Centralized review interface for approving or returning timesheets.
-- **Google Sheets Integration**: All data is persisted in a Google Spreadsheet for easy auditing and reporting.
-- **Production Ready**: Fully configured for deployment on **Render** using Blueprints.
+- **PostgreSQL Persistence**: All data is stored in a Neon PostgreSQL database for reliable, scalable auditing and reporting.
+- **Production Ready**: Optimized for deployment on **Render**.
 
 ## Tech Stack
 
 - **Frontend**: Streamlit (Premium Glassmorphism Theme)
 - **Backend**: FastAPI
-- **Data Store**: Google Spreadsheets (using `gspread`)
+- **Data Store**: PostgreSQL (Neon) using SQLAlchemy
 - **Automation**: APScheduler (Sunday 4:00 AM Auto-submission)
 - **E2E Testing**: Pytest + HTTPX
 
 ## Deployment on Render
 
-This project is ready for deployment on [Render](https://render.com/) using the provided `render.yaml`.
+This project is optimized for individual service deployment on Render.
 
-### 1. Preparation
+### 1. Backend Service (FastAPI)
 
-1. Create a Google Service Account and download the JSON credentials.
-2. Create a Google Spreadsheet and share it with the service account email.
-3. Convert your Service Account JSON into a single-line string.
+1. **Source**: Connect your GitHub repo.
+2. **Environment**: Python 3.
+3. **Build Command**: `pip install -r requirements.txt`
+4. **Start Command**: `export PYTHONPATH=$PYTHONPATH:. && gunicorn backend.main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+5. **Environment Variables**:
+   - `DATABASE_URL`: Your Neon connection string.
+   - `SECRET_KEY`: A random secret string.
+   - `PYTHON_VERSION`: `3.11.0`
+   - `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SYSTEM_EMAIL`: For email notifications.
 
-### 2. Launch
+### 2. Frontend Service (Streamlit)
 
-1. Connect your GitHub repository to Render.
-2. Render will automatically detect the `render.yaml` and create two services:
-   - `timesheet-backend` (FastAPI)
-   - `timesheet-frontend` (Streamlit)
-3. Configure the following **Environment Variables** in the Render Dashboard:
-   - `GOOGLE_SHEET_ID`: Your Spreadsheet ID.
-   - `GOOGLE_SERVICE_ACCOUNT_JSON`: The contents of your service account JSON file.
-   - `SMTP_USER` & `SMTP_PASSWORD`: For email notifications.
-   - `SYSTEM_EMAIL`: Sender email address.
+1. **Source**: Connect your GitHub repo.
+2. **Build Command**: `pip install -r requirements.txt`
+3. **Start Command**: `streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0`
+4. **Environment Variables**:
+   - `BACKEND_URL`: The URL of your deployed Backend service.
+   - `PYTHON_VERSION`: `3.11.0`
 
 ## Local Setup
 
@@ -50,18 +53,11 @@ This project is ready for deployment on [Render](https://render.com/) using the 
    ```bash
    pip install -r requirements.txt
    ```
-2. Create a `.env` file based on `.env.example`.
+2. Create a `.env` file containing your `DATABASE_URL`.
 
-### 2. Initialize Spreadsheet
+### 2. Run Locally
 
-```bash
-$env:PYTHONPATH="."
-python backend/setup_sheets.py
-```
-
-### 3. Run Locally
-
-You can use the provided `run.bat` (Windows) or start manually:
+Use the provided `run.bat` (Windows) or start manually:
 
 ```bash
 # Backend
@@ -70,6 +66,8 @@ uvicorn backend.main:app --reload
 # Frontend
 streamlit run frontend/app.py
 ```
+
+_Note: The database tables are automatically created on first run._
 
 ## Security & Validation
 

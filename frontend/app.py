@@ -267,50 +267,78 @@ if "temp_email" not in st.session_state: st.session_state.temp_email = ""
 if "otp_purpose" not in st.session_state: st.session_state.otp_purpose = ""
 if "access_token" not in st.session_state: st.session_state.access_token = None
 
+# --- Backend Waking Logic ---
+@st.cache_data(ttl=600)
+def wake_backend():
+    """Taps the backend to wake it from Render's free tier sleep."""
+    try:
+        # Just a light ping to the root or health check
+        requests.get(BACKEND_URL.rstrip("/") + "/", timeout=5)
+    except:
+        pass
+
+# Run wake-up silently in the background
+wake_backend()
+
 # --- API Helpers ---
-def api_call(method, endpoint, data=None, params=None, retries=5):
-    # Ensure no double slashes if BACKEND_URL has a trailing slash
+def api_call(method, endpoint, data=None, params=None, retries=6):
+    """
+    Robust API caller with exponential backoff and long timeouts 
+    specifically designed for Render Free Tier cold starts.
+    """
     base_url = BACKEND_URL.rstrip("/")
     final_url = f"{base_url}/{endpoint}"
     res = None
     
+    # Use a placeholder for the status message to keep UI clean
+    status_placeholder = st.empty()
+
     for attempt in range(retries):
         try:
             headers = {}
             if st.session_state.access_token:
                 headers["Authorization"] = f"Bearer {st.session_state.access_token}"
-                
+            
+            # Use a longer timeout on the first attempt to allow for cold start
+            # Render cold starts typically take 30-60 seconds
+            current_timeout = 60 if attempt == 0 else 25
+            
+            if attempt > 0:
+                status_placeholder.info(f"📡 Backend is waking up... Attempt {attempt+1}/{retries}")
+
             if method == "POST":
-                res = requests.post(final_url, json=data, headers=headers, timeout=20)
+                res = requests.post(final_url, json=data, headers=headers, timeout=current_timeout)
             else:
-                res = requests.get(final_url, params=params, headers=headers, timeout=20)
+                res = requests.get(final_url, params=params, headers=headers, timeout=current_timeout)
             
-            # More flexible JSON check: handle "application/json; charset=utf-8"
+            # Clear the waking status if we got a response
+            status_placeholder.empty()
+
+            # Handle common cold-start responses (502, 503, 504 are common while booting)
             content_type = res.headers.get("Content-Type", "").lower()
-            if res.status_code == 200 and "application/json" in content_type:
-                return res
-            
-            # If it's a 200 but not JSON, or a 50x error, it's likely the server waking up
-            if (res.status_code == 200 and "application/json" not in content_type) or res.status_code in [502, 503, 504]:
+            if res.status_code in [502, 503, 504] or (res.status_code == 200 and "application/json" not in content_type and endpoint != ""):
                 if attempt < retries - 1:
-                    wait_time = 2 + attempt # Increasing wait
+                    wait_time = 5 + (attempt * 3) # Recursive exponential wait
                     time.sleep(wait_time)
                     continue
-            
-            return res # Return what we have for 4xx or persistent errors
+
+            return res
             
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             if attempt < retries - 1:
-                time.sleep(3)
+                wait_time = 5 + (attempt * 3)
+                time.sleep(wait_time)
                 continue
+            status_placeholder.empty()
             break
         except Exception as e:
-            print(f"📡 API Error: {e}")
+            status_placeholder.empty()
+            print(f"📡 API Exception: {e}")
             break
             
     if res is None:
-        st.error(f"📡 **API Connection Error:** Could not reach the backend server.")
-        st.info(f"Connecting to: `{final_url}`")
+        st.error(f"📡 **Backend Timeout:** The server is taking too long to wake up.")
+        st.info("Render free tier puts apps to sleep. Please wait 10 seconds and click the button again.")
         st.divider()
     return res
 

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException, Body
 from datetime import datetime
-from backend.services.sheets import SheetManager
+from backend.services.database import DatabaseManager
 from backend.core.security import create_access_token
 from shared.schemas import UserStatus
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-sheet_manager = SheetManager()
+db_manager = DatabaseManager()
 
 @router.post("/register")
 async def register(
@@ -16,14 +16,14 @@ async def register(
     employee_id: str = Body(...)
 ):
     # Check if user already exists
-    if sheet_manager.get_user_by_email(email):
+    if db_manager.get_user_by_email(email):
         raise HTTPException(status_code=400, detail="User with this email already exists")
     
     # Check if employee ID exists
-    if sheet_manager.get_user_by_employee_id(employee_id):
+    if db_manager.get_user_by_employee_id(employee_id):
         raise HTTPException(status_code=400, detail="Employee ID already registered")
 
-    sheet_manager.add_user(
+    db_manager.add_user(
         email=email,
         password_hash=password, # As requested: no hashing
         role=role,
@@ -36,7 +36,7 @@ async def register(
 
 @router.post("/login")
 async def login(email: str = Body(...), password: str = Body(...)):
-    user = sheet_manager.get_user_by_email(email)
+    user = db_manager.get_user_by_email(email)
     
     # Direct comparison for simplicity; force string type for safety
     if not user or user["status"] != UserStatus.ACTIVE or str(password) != str(user.get("password_hash")):

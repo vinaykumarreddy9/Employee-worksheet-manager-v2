@@ -2,8 +2,8 @@ fastapi
 uvicorn[standard]
 gunicorn
 streamlit
-gspread
-oauth2client
+sqlalchemy
+psycopg2-binary
 pydantic
 pydantic-settings
 python-dotenv

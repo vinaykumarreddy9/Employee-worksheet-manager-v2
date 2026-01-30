@@ -3,7 +3,7 @@ import httpx
 import uuid
 import time
 from datetime import date, timedelta, datetime
-from backend.services.sheets import SheetManager
+from backend.services.database import DatabaseManager
 from backend.utils.helpers import get_available_weeks
 
 # Configuration
@@ -12,12 +12,12 @@ test_password = "TestPassword123"
 
 @pytest.mark.asyncio
 async def test_full_system_flow():
-    sheet_manager = SheetManager()
+    db_manager = DatabaseManager()
     base_url = "http://localhost:8000"
     
     # 1. Manual Setup: Inject User (Since signup is removed)
     print(f"\n[1/7] Injecting test user: {test_email}")
-    sheet_manager.add_user(
+    db_manager.add_user(
         email=test_email,
         password_hash=test_password, # Now plain text as per requirements
         role="Employee",
@@ -95,7 +95,7 @@ async def test_full_system_flow():
             "task_description": "Garbage",
             "work_type": "Billable"
         }, headers=headers)
-        temp_id = sheet_manager.get_pending_entries(test_email, target_week.isoformat())[-1]["entry_id"]
+        temp_id = db_manager.get_pending_entries(test_email, target_week.isoformat())[-1]["entry_id"]
         
         resp = await ac.post("/timesheets/delete", json={
             "entry_id": temp_id,

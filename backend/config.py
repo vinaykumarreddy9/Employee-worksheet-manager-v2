@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
-    GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
     MAX_DAILY_HOURS: float = 8.0
     SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-for-dev")
     # Prioritize PORT from env (Render/Heroku standard)

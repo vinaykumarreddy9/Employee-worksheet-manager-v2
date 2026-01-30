@@ -36,11 +36,19 @@ async def register(
 
 @router.post("/login")
 async def login(email: str = Body(...), password: str = Body(...)):
-    user = db_manager.get_user_by_email(email)
-    
-    # Direct comparison for simplicity; force string type for safety
-    if not user or user["status"] != UserStatus.ACTIVE or str(password) != str(user.get("password_hash")):
-        raise HTTPException(status_code=401, detail="Invalid credentials or inactive account")
-    
-    token = create_access_token({"sub": user["email"], "role": user["role"]})
-    return {"status": "success", "access_token": token, "user": user}
+    try:
+        user = db_manager.get_user_by_email(email)
+        
+        # Direct comparison for simplicity; force string type for safety
+        if not user or user["status"] != UserStatus.ACTIVE or str(password) != str(user.get("password_hash")):
+            raise HTTPException(status_code=401, detail="Invalid credentials or inactive account")
+        
+        token = create_access_token({"sub": user["email"], "role": user["role"]})
+        return {"status": "success", "access_token": token, "user": user}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_msg = f"Backend Crash: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=f"Database or Login logic failed: {str(e)}")

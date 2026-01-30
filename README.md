@@ -33,7 +33,7 @@ This project is optimized for individual service deployment on Render.
 5. **Environment Variables**:
    - `DATABASE_URL`: Your Neon connection string.
    - `SECRET_KEY`: A random secret string.
-   - `PYTHON_VERSION`: `3.12.0` (Recommended for stability, also supports 3.13)
+   - `PYTHON_VERSION`: `3.11.0` (Strictly required)
    - `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SYSTEM_EMAIL`: For email notifications.
 
 ### 2. Frontend Service (Streamlit)
@@ -43,7 +43,7 @@ This project is optimized for individual service deployment on Render.
 3. **Start Command**: `streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0`
 4. **Environment Variables**:
    - `BACKEND_URL`: The URL of your deployed Backend service.
-   - `PYTHON_VERSION`: `3.12.0`
+   - `PYTHON_VERSION`: `3.11.0`
 
 ## Local Setup
 

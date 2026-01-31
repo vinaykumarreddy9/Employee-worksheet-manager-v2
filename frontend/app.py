@@ -281,7 +281,7 @@ def wake_backend():
         pass
 
 # Run wake-up silently in the background
-wake_backend()
+#wake_backend()
 
 # --- API Helpers ---
 def api_call(method, endpoint, data=None, params=None, retries=6):
